@@ -1,4 +1,6 @@
 """
+All the constants are weights of the same layer
+
 :Date: Nov 14, 2019
 :Version: 0.0.1
 """
