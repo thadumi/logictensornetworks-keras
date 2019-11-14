@@ -16,34 +16,7 @@ from tensorflow.python.keras.engine import node as node_module
 from tensorflow.python.util.tf_export import keras_export
 
 
-@keras_export('keras.layers.InputLayer')
 class ConstantLayer(base_layer.Layer):
-    """Layer to be used as an entry point into a Network (a graph of layers).
-
-  It can either wrap an existing tensor (pass an `input_tensor` argument)
-  or create a placeholder tensor (pass arguments `input_shape`, and
-  optionally, `dtype`).
-
-  It is generally recommend to use the functional layer API via `Input`,
-  (which creates an `InputLayer`) without directly using `InputLayer`.
-
-  This class can create placeholders for tf.Tensors, tf.SparseTensors, and
-  tf.RaggedTensors by choosing 'sparse=True' or 'ragged=True'.
-
-  Arguments:
-      input_shape: Shape tuple (not including the batch axis), or `TensorShape`
-        instance (not including the batch axis).
-      batch_size: Optional input batch size (integer or None).
-      dtype: Datatype of the input.
-      input_tensor: Optional tensor to use as layer input
-          instead of creating a placeholder.
-      sparse: Boolean, whether the placeholder created is meant to be sparse.
-      ragged: Boolean, whether the placeholder created is meant to be ragged.
-          In this case, values of 'None' in the 'shape' argument represent
-          ragged dimensions. For more information about RaggedTensors, see
-          https://www.tensorflow.org/guide/ragged_tensors.
-      name: Name of the layer (string).
-  """
 
     def __init__(self,
                  label=None,
