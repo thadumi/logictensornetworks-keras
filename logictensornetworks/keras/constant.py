@@ -13,7 +13,6 @@ from tensorflow import keras as K
 from tensorflow.python.keras import backend
 from tensorflow.python.keras.engine import base_layer
 from tensorflow.python.keras.engine import node as node_module
-from tensorflow.python.util.tf_export import keras_export
 
 
 class ConstantLayer(base_layer.Layer):
