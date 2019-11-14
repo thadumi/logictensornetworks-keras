@@ -2,7 +2,7 @@
 A constant aka InputLayer with one weight ano no placeholders
 
 :Date: Nov 14, 2019
-:Version: 0.0.3
+:Version: 0.1.0
 """
 
 from __future__ import absolute_import
@@ -38,12 +38,16 @@ class ConstantLayer(base_layer.Layer):
                                   initializer=K.initializers.RandomUniform(minval=min_value,
                                                                            maxval=max_value),
                                   trainable=True)
+        self.is_placeholder = False
         self.built = True
-        # with graph.as_default():
 
+        graph = backend.get_graph()
+        with graph.as_default():
+            fake_input_tensor = backend.constant(backend.get_value(self._c),
+                                                 )
         # Create an input node to add to self.outbound_node
         # and set output_tensors' _keras_history.
-        fake_input_tensor = backend.constant(backend.get_value(self._c), name=name)
+
         fake_input_tensor._keras_history = base_layer.KerasHistory(self, 0, 0)
         fake_input_tensor._keras_mask = None
         node_module.Node(
@@ -76,6 +80,9 @@ def Constant(label=None,
     # Note that in this case train_output and test_output are the same pointer.
     outputs = constant_layer._inbound_nodes[0].output_tensors
     if len(outputs) == 1:
-        return outputs[0]
+        out = outputs[0]
     else:
-        return outputs
+        out = outputs
+
+    out.doms = []
+    return out

@@ -1,20 +1,18 @@
 """
-:Date: Nov 12, 2019
-:Version: 0.0.1
+:Date: Nov 14, 2019
+:Version: 0.0.2
 """
 
 import tensorflow as tf
 from tensorflow import keras as K
+from tensorflow.keras import layers as KL
 from tensorflow.keras import backend
+from constant import *
 
 from logictensornetworks import backend as be
 
 
-# BIAS_factor = 1e-7
-# BIAS = tf.Variable(0.0, trainable=False)
-
-
-class Predicate(K.layers.Layer):
+class Predicate(KL.Layer):
     def __init__(self,
                  label,
                  number_of_features=None,
@@ -42,7 +40,7 @@ class Predicate(K.layers.Layer):
         self.w = None
         self.u = None
 
-    def build(self, inputs):
+    def build(self, inputs_shape):
         # TODO: check if is passing a layer or a
         # https://github.com/keras-team/keras/issues/8131
 
@@ -58,9 +56,9 @@ class Predicate(K.layers.Layer):
                                      initializer=K.initializers.Ones(),
                                      trainable=True)
 
-        super(Predicate, self).build(True)
+        super(Predicate, self).build(inputs_shape)
 
-    def call(self, *inputs):
+    def call(self, inputs):
         crossed_args, list_of_args_in_crossed_args = be.cross_args(inputs)
         result = self._call_default_model(*list_of_args_in_crossed_args)
 
@@ -74,7 +72,7 @@ class Predicate(K.layers.Layer):
         return result
 
     def _call_default_model(self, *inputs):
-        app_label = self.label + "/" + "_".join([arg.name.split(":")[0] for arg in inputs]) + "/"
+        # app_label = self.label + "/" + "_".join([arg.name.split(":")[0] for arg in inputs]) + "/"
         tensor_args = tf.concat(inputs, axis=1)
 
         W = tf.linalg.band_part(self.w, 0, -1)
@@ -85,16 +83,24 @@ class Predicate(K.layers.Layer):
 
         gX = tf.matmul(tf.tanh(XWX), self.u)
 
-        return tf.sigmoid(gX, name=app_label)
+        return tf.sigmoid(gX)
 
 
 # K.Input(shape=shape, name='constant_' + label)
-def constant(label, shape):
-    c = tf.Variable()
+def __constant(label, shape):
+    # c = K.Input(shape=embedding_size, name=label)
+    c = tf.Variable(tf.random.uniform(
+        shape=(1, shape),
+        minval=[0.] * shape,
+        maxval=[1.] * shape),
+        name=label)
     c.doms = []
+    return c
+
 
 def variable(label, shape):
     pass
+
 
 def predicate(label, features):
     return lambda *inputs: Predicate(label, number_of_features=features)(*inputs)
@@ -103,7 +109,8 @@ def predicate(label, features):
 embedding_size = 10  # each constant is interperted in a vector of this size
 
 # create on constant for each individual a,b,... i,j, ...
-constants = {l: constant(l, embedding_size) for l in 'abcdefghijklmn'}
+
+constants = {l: Constant(l, min_value=[0] * embedding_size, max_value=[1.] * embedding_size) for l in 'abcdefghijklmn'}
 
 friends = [('a', 'b'), ('a', 'e'), ('a', 'f'), ('a', 'g'), ('b', 'c'), ('c', 'd'), ('e', 'f'), ('g', 'h'),
            ('i', 'j'), ('j', 'm'), ('k', 'l'), ('m', 'n')]
@@ -112,7 +119,17 @@ Friends = predicate('Friends', embedding_size * 2)
 Smokers = predicate('Smokers', embedding_size)
 Cancer = predicate('Cancer', embedding_size)
 
-facts = [Friends(constants[x], constants[y]) for (x, y) in friends]
-out = K.layers.Concatenate()(facts)
+facts = [Friends([constants[x], constants[y]]) for (x, y) in friends]
+out = KL.Concatenate()(facts)
 
 model = K.Model(inputs=constants, outputs=out)
+
+'''
+a = Constant('a', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
+b = Constant('b', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
+
+Friends = predicate('Friends', embedding_size * 2)
+
+out = Friends([a, b])
+model = K.Model(inputs=[a, b], outputs=out)
+'''
