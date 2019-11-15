@@ -1,8 +1,8 @@
 """
 A constant aka InputLayer with one weight ano no placeholders
 
-:Date: Nov 14, 2019
-:Version: 0.1.0
+:Date: Nov 15, 2019
+:Version: 0.1.1
 """
 
 from __future__ import absolute_import
@@ -50,6 +50,8 @@ class ConstantLayer(base_layer.Layer):
 
         fake_input_tensor._keras_history = base_layer.KerasHistory(self, 0, 0)
         fake_input_tensor._keras_mask = None
+        fake_input_tensor.doms = []
+
         node_module.Node(
             self,
             inbound_layers=[],
@@ -79,10 +81,4 @@ def Constant(label=None,
     # Return tensor including `_keras_history`.
     # Note that in this case train_output and test_output are the same pointer.
     outputs = constant_layer._inbound_nodes[0].output_tensors
-    if len(outputs) == 1:
-        out = outputs[0]
-    else:
-        out = outputs
-
-    out.doms = []
-    return out
+    return outputs[0] if len(outputs) == 1 else outputs
