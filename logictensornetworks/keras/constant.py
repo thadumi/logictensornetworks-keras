@@ -2,7 +2,7 @@
 A constant aka InputLayer with one weight ano no placeholders
 
 :Date: Nov 15, 2019
-:Version: 0.1.1
+:Version: 0.1.2
 """
 
 from __future__ import absolute_import
@@ -65,14 +65,18 @@ def Constant(label=None,
              min_value=None,
              max_value=None,
              **kwargs):
-    '''
-    TODO: check args
-    if shape is None and tensor is None:
-        raise ValueError('Please provide to Input either a `shape`'
-                         ' or a `tensor` argument. Note that '
-                         '`shape` does not include the batch '
-                         'dimension.')
-    '''
+    if label is None:
+        raise ValueError('Please provide to Variable the label value.')
+
+    if min_value is None and max_value is None:
+        raise ValueError('Please provide to Constant either a `min_value`'
+                         ' or a `max_value` argument. Note that '
+                         'you can also provide both.')
+
+    if min_value is None:
+        min_value = [0.] * len(max_value)
+    elif max_value is None:
+        max_value = [1.] * len(min_value)
 
     constant_layer = ConstantLayer(label=label,
                                    min_value=min_value,
