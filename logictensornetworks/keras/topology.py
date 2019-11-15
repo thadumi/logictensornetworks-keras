@@ -1,14 +1,16 @@
 """
 :Date: Nov 15, 2019
-:Version: 0.0.2
+:Version: 0.0.3
 """
 
 import tensorflow as tf
 from tensorflow import keras as K
 from tensorflow.keras import layers as KL
 from tensorflow.keras import backend
+
 from constant import *
 from variable import *
+from logic_layers import *
 
 from logictensornetworks import backend as be
 
@@ -60,6 +62,8 @@ class Predicate(KL.Layer):
         super(Predicate, self).build(inputs_shape)
 
     def call(self, inputs):
+        # TODO: allow inputs as single tensor and autowrap it into a list
+
         crossed_args, list_of_args_in_crossed_args = be.cross_args(inputs)
         result = self._call_default_model(*list_of_args_in_crossed_args)
 
@@ -68,6 +72,7 @@ class Predicate(KL.Layer):
         else:
             result = tf.reshape(result, (1,))
         result.doms = crossed_args.doms
+        self.doms = result.doms
 
         # BIAS.assign(tf.divide(BIAS + .5 - tf.reduce_mean(result), 2) * BIAS_factor)
         return result
@@ -100,12 +105,16 @@ def __constant(label, shape):
 
 
 def predicate(label, features):
-    return lambda *inputs: Predicate(label, number_of_features=features)(*inputs)
+    def pred(*inputs):
+        layer = Predicate(label, number_of_features=features)
+        tensor = layer(*inputs)
+        tensor.doms = layer.doms
+        return tensor
+
+    return pred
 
 
 if __name__ == '__main__':
-
-
     embedding_size = 10  # each constant is interperted in a vector of this size
 
     # create on constant for each individual a,b,... i,j, ...
@@ -114,31 +123,52 @@ if __name__ == '__main__':
     g2 = {l: Constant(l, min_value=[0] * embedding_size, max_value=[1.] * embedding_size) for l in 'ijklmn'}
     g = {**g1, **g2}
 
-    friends = [('a', 'b'), ('a', 'e'), ('a', 'f'), ('a', 'g'), ('b', 'c'), ('c', 'd'), ('e', 'f'), ('g', 'h'),
-               ('i', 'j'), ('j', 'm'), ('k', 'l'), ('m', 'n')]
-    smokes = ['a', 'e', 'f', 'g', 'j', 'n']
-    cancer = ['a', 'e']
+    friends_const = [('a', 'b'), ('a', 'e'), ('a', 'f'), ('a', 'g'), ('b', 'c'), ('c', 'd'), ('e', 'f'), ('g', 'h'),
+                     ('i', 'j'), ('j', 'm'), ('k', 'l'), ('m', 'n')]
+    smokes_const = ['a', 'e', 'f', 'g', 'j', 'n']
+    cancer_const = ['a', 'e']
 
-    p = Variable(label='p', tensor=KL.Concatenate()(list(g.values())))
-    q = Variable(label='q', tensor=KL.Concatenate()(list(g.values())))
-    p1 = Variable(label='p1', tensor=KL.Concatenate()(list(g1.values())))
-    q1 = Variable(label='q1', tensor=KL.Concatenate()(list(g1.values())))
-    p2 = Variable(label='p2', tensor=KL.Concatenate()(list(g2.values())))
-    q2 = Variable(label='q2', tensor=KL.Concatenate()(list(g2.values())))
-
+    p = Variable(label='p', tensor=KL.Concatenate(axis=0)(list(g.values())))
+    q = Variable(label='q', tensor=KL.Concatenate(axis=0)(list(g.values())))
+    p1 = Variable(label='p1', tensor=KL.Concatenate(axis=0)(list(g1.values())))
+    q1 = Variable(label='q1', tensor=KL.Concatenate(axis=0)(list(g1.values())))
+    p2 = Variable(label='p2', tensor=KL.Concatenate(axis=0)(list(g2.values())))
+    q2 = Variable(label='q2', tensor=KL.Concatenate(axis=0)(list(g2.values())))
 
     Friends = predicate('Friends', embedding_size * 2)
-    Smokers = predicate('Smokers', embedding_size)
+    Smokes = predicate('Smokers', embedding_size)
     Cancer = predicate('Cancer', embedding_size)
 
-    facts = [Friends([g[x], g[y]]) for (x, y) in friends]
+    friends = [Friends([g[x], g[y]]) for (x, y) in friends_const]
+    not_friends = [Not(Friends([g[x], g[y]])) for x in g1 for y in g1 if (x, y) not in friends_const and x < y] + \
+                  [Not(Friends([g[x], g[y]])) for x in g2 for y in g2 if (x, y) not in friends_const and x < y]
+    smokers = [Smokes([g[x]]) for x in smokes_const]
+    not_smokes = [Not(Smokes([g[x]])) for x in g if x not in smokes_const]
+    has_cancers = [Cancer([g[x]]) for x in cancer_const]
+    has_not_cancers = [Not(Cancer([g[x]])) for x in g1 if x not in cancer_const]
 
-    '''
-    a = Constant('a', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
-    b = Constant('b', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
-    
-    Friends = predicate('Friends', embedding_size * 2)
-    
-    out = Friends([a, b])
-    model = K.Model(inputs=[a, b], outputs=out)
-    '''
+    facts = friends + \
+            not_friends + \
+            smokers + \
+            not_smokes + \
+            has_cancers + \
+            has_not_cancers + \
+            [Forall(p, Not(Friends([p, p]))),
+             Forall(p, q, Equiv(Friends([p, q]), Friends([q, p]))),
+             Equiv(Forall(p1, Implies(Smokes([p1]), Cancer([p1]))),
+                   Forall(p2, Implies(Smokes([p2]), Cancer([p2])))),
+             Equiv(Forall(p1, Implies(Cancer([p1]), Smokes([p1]))),
+                   Forall(p2, Implies(Cancer([p2]), Smokes([p2]))))
+             ]
+    out = KL.Concatenate(axis=0)(facts)
+    model = K.Model(inputs=[p, q, p1, q1, p2, q2, *g.values()], outputs=out)
+
+'''
+a = Constant('a', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
+b = Constant('b', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
+
+Friends = predicate('Friends', embedding_size * 2)
+
+out = Friends([a, b])
+model = K.Model(inputs=[a, b], outputs=out)
+'''
