@@ -6,8 +6,8 @@ The following is what we are using for development. Basically similar versions s
 
 * python3.7
 * tensorflow >=2.0 (for running the core, wrapper etc)
-* numpy >= 1.13.3 (for examples and tests)
-* matplotlib >= 2.1 (for examples)
+* numpy >= 1.17.2 (for examples and tests)
+* matplotlib >= 3.1.1 (for examples)
 
 Installing dependencies is easy. Just use ``pip install tensorflow numpy matplotlib`` or use a virtualenv.
 
