@@ -1,3 +1,8 @@
+"""
+:Date: Nov 18, 2019
+:Version: 0.1.0
+"""
+
 import tensorflow as tf
 
 from norms import TRIANGULAR_NORMS
@@ -53,22 +58,22 @@ def cross_args(args):
 
 
 def cross_2args(X, Y):
-    if X.doms == [] and Y.doms == []:
+    if X._ltn_doms == [] and Y._ltn_doms == []:
         result = tf.concat([X, Y], axis=-1)
-        result.doms = []
+        result._ltn_doms = []
         return result, [X, Y]
 
-    X_Y = set(X.doms) - set(Y.doms)
-    Y_X = set(Y.doms) - set(X.doms)
+    X_Y = set(X._ltn_doms) - set(Y._ltn_doms)
+    Y_X = set(Y._ltn_doms) - set(X._ltn_doms)
 
     eX = X
-    eX_doms = [x for x in X.doms]
+    eX_doms = [x for x in X._ltn_doms]
     for y in Y_X:
         eX = tf.expand_dims(eX, 0)
         eX_doms = [y] + eX_doms
 
     eY = Y
-    eY_doms = [y for y in Y.doms]
+    eY_doms = [y for y in Y._ltn_doms]
     for x in X_Y:
         eY = tf.expand_dims(eY, -2)
         eY_doms.append(x)
@@ -89,8 +94,34 @@ def cross_2args(X, Y):
     result2 = tf.tile(eY, mult_eY)
     result = tf.concat([result1, result2], axis=-1)
 
-    result1.doms = eX_doms
-    result2.doms = eX_doms
-    result.doms = eX_doms
+    result1._ltn_doms = eX_doms
+    result2._ltn_doms = eX_doms
+    result._ltn_doms = eX_doms
 
     return result, [result1, result2]
+
+def doms_cross_args(args):
+    doms = args[0]
+
+    for arg in args[1:]:
+        result = doms_cross_2args(doms, arg)
+
+    return doms
+
+
+def doms_cross_2args(X, Y):
+    if X == [] and Y == []:
+        return []
+
+    X_Y = set(X) - set(Y)
+    Y_X = set(Y) - set(X)
+
+    eX_doms = [x for x in X._ltn_doms]
+    for y in Y_X:
+        eX_doms = [y] + eX_doms
+
+    eY_doms = [y for y in Y._ltn_doms]
+    for x in X_Y:
+        eY_doms.append(x)
+
+    return eX_doms, eY_doms

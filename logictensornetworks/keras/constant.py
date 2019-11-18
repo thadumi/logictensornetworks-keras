@@ -1,8 +1,8 @@
 """
 A constant aka InputLayer with one weight ano no placeholders
 
-:Date: Nov 15, 2019
-:Version: 0.1.3
+:Date: Nov 18, 2019
+:Version: 0.1.5
 """
 
 from __future__ import absolute_import
@@ -40,17 +40,18 @@ class ConstantLayer(base_layer.Layer):
                                   trainable=True)
         self.is_placeholder = False
         self.built = True
-        # self.batch_size = len(min_value)
+        self._batch_input_shape = (len(min_value), )
+        #self.batch_size = len(min_value)
 
-        graph = backend.get_graph()
-        with graph.as_default():
-            fake_input_tensor = backend.constant(backend.get_value(self._c))
+        #graph = backend.get_graph()
+        #with graph.as_default():
+        #    fake_input_tensor = backend.constant(backend.get_value(self._c))
         # Create an input node to add to self.outbound_node
         # and set output_tensors' _keras_history.
-
+        fake_input_tensor = self._c
         fake_input_tensor._keras_history = base_layer.KerasHistory(self, 0, 0)
         fake_input_tensor._keras_mask = None
-        fake_input_tensor.doms = []
+        fake_input_tensor._ltn_doms = []
 
         node_module.Node(
             self,

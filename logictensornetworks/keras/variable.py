@@ -1,8 +1,8 @@
 """
-A variable aka InputLayer
+A variable aka InputLayer (placeholder) or a combination of constants
 
-:Date: Nov 15, 2019
-:Version: 0.0.1
+:Date: Nov 18, 2019
+:Version: 0.1.0
 """
 
 from __future__ import absolute_import
@@ -10,6 +10,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow import keras as K
+
 
 class VariableLayer(K.layers.InputLayer):
 
@@ -49,22 +50,28 @@ def Variable(label=None,
                          '`shape` does not include the batch '
                          'dimension.')
 
-    variable_layer = VariableLayer(name=label,
-                                   input_shape=shape,
-                                   input_tensor=tensor,
-                                   sparse=sparse,
-                                   ragged=ragged)
+    if tensor is None:  # a variable is a placeholder
+        variable_layer = VariableLayer(name=label,
+                                       input_shape=shape,
+                                       input_tensor=tensor,
+                                       sparse=sparse,
+                                       ragged=ragged)
 
-    # Return tensor including `_keras_history` and `doms`.
-    # Note that in this case train_output and test_output are the same pointer.
-    outputs = variable_layer._inbound_nodes[0].output_tensors
+        # Return tensor including `_keras_history` and `doms`.
+        # Note that in this case train_output and test_output are the same pointer.
+        outputs = variable_layer._inbound_nodes[0].output_tensors
+    else:
+        # a variable is a combination of constants therefor is not a placeholder
+        # TODO(thadumi) should provide the API for defining just the set of variables and then
+        #               combine theme here with a KL.Constants(axis=0)
+        outputs = (tensor,)
 
     if len(outputs) == 1:
         out = outputs[0]
-        out.doms = [label]
+        out._ltn_doms = [label]
     else:
         out = outputs
         for o in outputs:
-            o.doms = [label]
+            o._ltn_doms = [label]
 
     return out

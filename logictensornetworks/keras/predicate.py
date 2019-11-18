@@ -1,28 +1,28 @@
 """
-:Date: Nov 15, 2019
-:Version: 0.0.3
+:Date: Nov 18, 2019
+:Version: 0.1.0
 """
 
-import tensorflow as tf
-from tensorflow import keras as K
 from tensorflow.keras import layers as KL
-from tensorflow.keras import backend
 
+from base_ltn_layer import LtnLayer
 from constant import *
-from variable import *
 from logic_layers import *
-
 from logictensornetworks import backend as be
+from variable import *
 
 
-class Predicate(KL.Layer):
+class PredicateLayer(LtnLayer):
     def __init__(self,
                  label,
                  number_of_features=None,
                  pred_definition=None,
                  layers=None,
-                 *kwargs):
-        super(Predicate, self).__init__(*kwargs)
+                 **kwargs):
+        # name = 'P_' + label + '_' + str(backend.get_uid(label))
+        # kwargs['name'] = name
+
+        super(PredicateLayer, self).__init__(**kwargs)
 
         self.label = label
         self.number_of_features = None
@@ -59,7 +59,7 @@ class Predicate(KL.Layer):
                                      initializer=K.initializers.Ones(),
                                      trainable=True)
 
-        super(Predicate, self).build(inputs_shape)
+        super(PredicateLayer, self).build(inputs_shape)
 
     def call(self, inputs):
         # TODO: allow inputs as single tensor and autowrap it into a list
@@ -67,14 +67,12 @@ class Predicate(KL.Layer):
         crossed_args, list_of_args_in_crossed_args = be.cross_args(inputs)
         result = self._call_default_model(*list_of_args_in_crossed_args)
 
-        if crossed_args.doms:
+        if crossed_args._ltn_doms:
             result = tf.reshape(result, tf.concat([tf.shape(crossed_args)[:-1], [1]], axis=0))
         else:
             result = tf.reshape(result, (1,))
-        result.doms = crossed_args.doms
-        self.doms = result.doms
 
-        # BIAS.assign(tf.divide(BIAS + .5 - tf.reduce_mean(result), 2) * BIAS_factor)
+        self._computed_doms = crossed_args._ltn_doms
         return result
 
     def _call_default_model(self, *inputs):
@@ -91,27 +89,11 @@ class Predicate(KL.Layer):
 
         return tf.sigmoid(gX)
 
+    def compute_doms(self, inputs, **kwargs):
+        return self._computed_doms
 
-# K.Input(shape=shape, name='constant_' + label)
-def __constant(label, shape):
-    # c = K.Input(shape=embedding_size, name=label)
-    c = tf.Variable(tf.random.uniform(
-        shape=(1, shape),
-        minval=[0.] * shape,
-        maxval=[1.] * shape),
-        name=label)
-    c.doms = []
-    return c
-
-
-def predicate(label, features):
-    def pred(*inputs):
-        layer = Predicate(label, number_of_features=features)
-        tensor = layer(*inputs)
-        tensor.doms = layer.doms
-        return tensor
-
-    return pred
+def Predicate(label, features):
+    return lambda *inputs: PredicateLayer(label, number_of_features=features)(inputs)
 
 
 if __name__ == '__main__':
@@ -135,17 +117,17 @@ if __name__ == '__main__':
     p2 = Variable(label='p2', tensor=KL.Concatenate(axis=0)(list(g2.values())))
     q2 = Variable(label='q2', tensor=KL.Concatenate(axis=0)(list(g2.values())))
 
-    Friends = predicate('Friends', embedding_size * 2)
-    Smokes = predicate('Smokers', embedding_size)
-    Cancer = predicate('Cancer', embedding_size)
+    Friends = Predicate('Friends', embedding_size * 2)
+    Smokes = Predicate('Smokers', embedding_size)
+    Cancer = Predicate('Cancer', embedding_size)
 
-    friends = [Friends([g[x], g[y]]) for (x, y) in friends_const]
-    not_friends = [Not(Friends([g[x], g[y]])) for x in g1 for y in g1 if (x, y) not in friends_const and x < y] + \
-                  [Not(Friends([g[x], g[y]])) for x in g2 for y in g2 if (x, y) not in friends_const and x < y]
-    smokers = [Smokes([g[x]]) for x in smokes_const]
-    not_smokes = [Not(Smokes([g[x]])) for x in g if x not in smokes_const]
-    has_cancers = [Cancer([g[x]]) for x in cancer_const]
-    has_not_cancers = [Not(Cancer([g[x]])) for x in g1 if x not in cancer_const]
+    friends = [Friends(g[x], g[y]) for (x, y) in friends_const]
+    not_friends = [Not(Friends(g[x], g[y])) for x in g1 for y in g1 if (x, y) not in friends_const and x < y] + \
+                  [Not(Friends(g[x], g[y])) for x in g2 for y in g2 if (x, y) not in friends_const and x < y]
+    smokers = [Smokes(g[x]) for x in smokes_const]
+    not_smokes = [Not(Smokes(g[x])) for x in g if x not in smokes_const]
+    has_cancers = [Cancer(g[x]) for x in cancer_const]
+    has_not_cancers = [Not(Cancer(g[x])) for x in g1 if x not in cancer_const]
 
     facts = friends + \
             not_friends + \
@@ -153,15 +135,16 @@ if __name__ == '__main__':
             not_smokes + \
             has_cancers + \
             has_not_cancers + \
-            [Forall(p, Not(Friends([p, p]))),
-             Forall(p, q, Equiv(Friends([p, q]), Friends([q, p]))),
-             Equiv(Forall(p1, Implies(Smokes([p1]), Cancer([p1]))),
-                   Forall(p2, Implies(Smokes([p2]), Cancer([p2])))),
-             Equiv(Forall(p1, Implies(Cancer([p1]), Smokes([p1]))),
-                   Forall(p2, Implies(Cancer([p2]), Smokes([p2]))))
+            [Forall(p, Not(Friends(p, p))),
+             Forall((p, q), Equiv(Friends(p, q), Friends(q, p))),
+             Equiv(Forall(p1, Implies(Smokes(p1), Cancer(p1))),
+                   Forall(p2, Implies(Smokes(p2), Cancer(p2)))),
+             Equiv(Forall(p1, Implies(Cancer(p1), Smokes(p1))),
+                   Forall(p2, Implies(Cancer(p2), Smokes(p2))))
              ]
-    out = KL.Concatenate(axis=0)(facts)
-    model = K.Model(inputs=[p, q, p1, q1, p2, q2, *g.values()], outputs=out)
+
+    theory = KL.Concatenate(axis=0)(facts)
+    # model = K.Model(inputs=[*g.values()], outputs=out)
 
 '''
 a = Constant('a', min_value=[0] * embedding_size, max_value=[1.] * embedding_size)
